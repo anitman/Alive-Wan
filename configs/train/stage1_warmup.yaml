@@ -1,0 +1,168 @@
+# Stage 1: TA-CrossAttn Warmup Training Configuration
+# Freeze Video DiT + Audio DiT, train only cross-attention layers
+
+# Experiment metadata
+experiment:
+  name: "stage1_ta_warmup"
+  description: "TA-CrossAttn warmup training for AV alignment"
+  phase: 1
+
+# Model settings
+model:
+  joint_av_dit:
+    path: "./configs/model/joint_av_dit.yaml"
+    freeze_video_dit: true
+    freeze_audio_dit: true
+    train_ta_cross_attn: true
+    train_projections: true
+
+# Data settings
+data:
+  # Datasets
+  datasets:
+    - name: "vggsound"
+      path: "./data/vggsound"
+      weight: 0.5
+      transforms:
+        - video:
+            resize: [480, 480]
+            center_crop: [480, 480]
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+    
+    - name: "audioset"
+      path: "./data/audioset"
+      weight: 0.5
+      transforms:
+        - video:
+            resize: [480, 480]
+            center_crop: [480, 480]
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+  
+  # Data loading
+  loader:
+    batch_size: 64
+    num_workers: 8
+    pin_memory: true
+    drop_last: true
+  
+  # Augmentation
+  augmentation:
+    video:
+      horizontal_flip: 0.5
+      color_jitter: 0.3
+    audio:
+      pitch_shift: 0.0  # Keep pitch for lip-sync
+      time_stretch: 0.0  # Keep timing for sync
+
+# Training settings
+training:
+  # Optimizer
+  optimizer:
+    type: "adamw"
+    lr: 1.0e-4
+    weight_decay: 0.01
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1.0e-8
+  
+  # Learning rate scheduler
+  scheduler:
+    type: "cosine"
+    warmup_steps: 5000
+    total_steps: 50000
+    min_lr_ratio: 0.1
+  
+  # Training loop
+  max_steps: 50000
+  save_steps: 5000
+  eval_steps: 1000
+  log_steps: 100
+  
+  # Gradient settings
+  grad_clip_norm: 1.0
+  grad_accumulation_steps: 1
+  
+  # Mixed precision
+  amp:
+    enabled: true
+    dtype: "bfloat16"
+  
+  # Checkpointing
+  checkpoint:
+    save_interval: 5000
+    keep_last: 5
+    resume: null
+
+# Loss settings
+loss:
+  # Flow Matching loss
+  flow_matching:
+    type: "rectified"
+    video_weight: 1.0
+    audio_weight: 1.0
+  
+  # Additional sync loss (optional)
+  sync_loss:
+    enabled: false  # Can enable for stronger sync learning
+    type: "l2_temporal"
+    weight: 0.1
+
+# Validation
+validation:
+  enabled: true
+  interval: 1000
+  
+  # Metrics
+  metrics:
+    - name: "fm_loss"
+      description: "Flow Matching loss"
+    - name: "video_fvd"
+      description: "Video FVD (freezer)"
+    - name: "audio_fid"
+      description: "Audio FID"
+    - name: "sync_score"
+      description: "Audio-visual sync score"
+
+# Logging
+logging:
+  # TensorBoard
+  tensorboard:
+    enabled: true
+    log_dir: "./logs/stage1_ta_warmup"
+  
+  # WandB
+  wandb:
+    enabled: true
+    project: "alive-wan2x"
+    name: "stage1_ta_warmup"
+    entity: null
+  
+  # Log level
+  level: "INFO"
+
+# Distributed training
+distributed:
+  backend: "nccl"
+  find_unused_parameters: false
+  
+  # FSDP settings
+  fsdp:
+    enabled: true
+    sharding_strategy: "FULL_SHARD"
+    mixed_precision: true
+    gradient_checkpointing: true
+
+# Hardware
+hardware:
+  # GPU settings
+  gpu:
+    num_workers_per_gpu: 1
+    memory_fraction: 0.9
+  
+  # CPU settings
+  cpu:
+    num_threads: 16

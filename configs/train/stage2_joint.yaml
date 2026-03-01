@@ -1,0 +1,206 @@
+# Stage 2: Joint Fine-tuning Configuration
+# Unfreeze Audio DiT (low LR), keep Video DiT frozen, train TA-CrossAttn
+
+# Experiment metadata
+experiment:
+  name: "stage2_joint"
+  description: "Joint AV fine-tuning with asymmetric learning rates"
+  phase: 2
+
+# Model settings
+model:
+  joint_av_dit:
+    path: "./configs/model/joint_av_dit.yaml"
+    freeze_video_dit: true
+    freeze_audio_dit: false
+    audio_learning_rate_scale: 0.1  # 10x lower LR
+    train_ta_cross_attn: true
+
+# Data settings
+data:
+  # Datasets - focus on high-quality AV data
+  datasets:
+    - name: "vggsound"
+      path: "./data/vggsound"
+      weight: 0.3
+      transforms:
+        - video:
+            resize: [480, 480]
+            center_crop: [480, 480]
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+    
+    - name: "lrs3"
+      path: "./data/lrs3"
+      weight: 0.3  # Lip-sync data
+      transforms:
+        - video:
+            resize: [480, 480]
+            center_crop: [480, 480]
+            face_crop: true  # Focus on lip region
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+    
+    - name: "voxceleb2"
+      path: "./data/voxceleb2"
+      weight: 0.2  # Speaker diversity
+      transforms:
+        - video:
+            resize: [480, 480]
+            center_crop: [480, 480]
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+    
+    - name: "webvid_audio"
+      path: "./data/webvid_audio"
+      weight: 0.2  # General AV data
+      transforms:
+        - video:
+            resize: [480, 480]
+            center_crop: [480, 480]
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+  
+  # Data loading
+  loader:
+    batch_size: 64
+    num_workers: 8
+    pin_memory: true
+    drop_last: true
+  
+  # Progressive data mixing
+  progressive_mixing:
+    enabled: true
+    # Gradually increase AV data ratio to prevent audio forgetting
+    schedule:
+      - step: 0
+        audio_only_ratio: 0.3
+      - step: 20000
+        audio_only_ratio: 0.2
+      - step: 50000
+        audio_only_ratio: 0.1
+
+# Training settings
+training:
+  # Optimizer with asymmetric learning rates
+  optimizer:
+    type: "adamw"
+    param_groups:
+      - name: "video_dit"
+        lr: 0.0  # Frozen
+        weight_decay: 0.01
+      - name: "audio_dit"
+        lr: 1.0e-5  # Low LR to prevent catastrophic forgetting
+        weight_decay: 0.01
+      - name: "ta_cross_attn"
+        lr: 1.0e-4  # Normal LR
+        weight_decay: 0.01
+      - name: "projections"
+        lr: 1.0e-4
+        weight_decay: 0.01
+    
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1.0e-8
+  
+  # Learning rate scheduler
+  scheduler:
+    type: "cosine"
+    warmup_steps: 10000
+    total_steps: 200000
+    min_lr_ratio: 0.1
+  
+  # Training loop
+  max_steps: 200000
+  save_steps: 10000
+  eval_steps: 2000
+  log_steps: 100
+  
+  # Gradient settings
+  grad_clip_norm: 1.0
+  grad_accumulation_steps: 2
+  
+  # Mixed precision
+  amp:
+    enabled: true
+    dtype: "bfloat16"
+  
+  # Checkpointing
+  checkpoint:
+    save_interval: 10000
+    keep_last: 3
+    resume: null
+  
+  # EMA (higher decay for audio)
+  ema:
+    enabled: true
+    decay: 0.9999
+    # Per-module EMA (if supported)
+    module_decay:
+      audio_dit: 0.99995  # Higher for audio stability
+
+# Loss settings
+loss:
+  # Flow Matching loss
+  flow_matching:
+    type: "rectified"
+    video_weight: 1.0
+    audio_weight: 1.0
+  
+  # Audio quality preservation loss
+  audio_quality:
+    enabled: true
+    type: "reconstruction"
+    weight: 0.1  # Help prevent quality degradation
+
+# Validation
+validation:
+  enabled: true
+  interval: 2000
+  
+  # Metrics
+  metrics:
+    - name: "fm_loss"
+      description: "Flow Matching loss"
+    - name: "video_fvd"
+      description: "Video FVD"
+    - name: "audio_fid"
+      description: "Audio FID (watch for degradation)"
+    - name: "sync_score"
+      description: "AV sync score"
+    - name: "audio_mos"
+      description: "Audio MOS estimate"
+  
+  # Audio quality monitoring
+  audio_monitoring:
+    enabled: true
+    # Generate samples every N steps to check for quality degradation
+    sample_interval: 5000
+
+# Logging
+logging:
+  tensorboard:
+    enabled: true
+    log_dir: "./logs/stage2_joint"
+  
+  wandb:
+    enabled: true
+    project: "alive-wan2x"
+    name: "stage2_joint"
+  
+  level: "INFO"
+
+# Distributed training
+distributed:
+  backend: "nccl"
+  find_unused_parameters: false
+  
+  fsdp:
+    enabled: true
+    sharding_strategy: "FULL_SHARD"
+    mixed_precision: true
+    gradient_checkpointing: true

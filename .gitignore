@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Model weights (download separately)
+models/wan2.1-t2v-14b/
+models/wan2.2-t2v-a14b/
+models/flan-t5-xxl/
+models/qwen2.5-32b/
+*.bin
+*.safetensors
+*.ckpt
+
+# Training outputs
+outputs/
+logs/
+*.log
+
+# Data
+data/raw/
+data/processed/
+*.mp4
+*.wav
+*.avi
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+
+# LLM tooling (not part of project source)
+.opencode/
+CLAUDE.md
+.claude/

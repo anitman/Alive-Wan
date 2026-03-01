@@ -1,0 +1,128 @@
+# Stage 4: AV Refiner Training Configuration
+# Train video upsampler for 480P → 1080P, audio passthrough
+
+# Experiment metadata
+experiment:
+  name: "stage4_refiner"
+  description: "AV Refiner training for 1080P upscaling"
+  phase: 4
+
+# Model settings
+model:
+  av_refiner:
+    path: "./configs/model/av_refiner.yaml"
+    base_model_path: "./logs/stage3_finetune/checkpoint_best.pt"
+    audio_dit_path: "./logs/stage3_finetune/audio_dit.pt"
+    freeze_base: true
+    freeze_audio: true
+
+# Data settings
+data:
+  # Datasets - high resolution AV data
+  datasets:
+    - name: "hd_video_audio"
+      path: "./data/hd_video_audio"
+      weight: 1.0
+      transforms:
+        - video:
+            resize: [1920, 1080]
+            center_crop: [1920, 1080]
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+  
+  # Data loading
+  loader:
+    batch_size: 16
+    num_workers: 8
+    pin_memory: true
+    drop_last: true
+  
+  # Two-resolution data
+  multi_resolution:
+    enabled: true
+    base_resolution: [854, 480]
+    refiner_resolution: [1920, 1080]
+
+# Training settings
+training:
+  # Optimizer
+  optimizer:
+    type: "adamw"
+    lr: 1.0e-4
+    weight_decay: 0.01
+    beta1: 0.9
+    beta2: 0.999
+  
+  # Learning rate scheduler
+  scheduler:
+    type: "cosine"
+    warmup_steps: 2000
+    total_steps: 50000
+    min_lr_ratio: 0.1
+  
+  # Training loop
+  max_steps: 50000
+  save_steps: 5000
+  eval_steps: 1000
+  log_steps: 50
+  
+  # Gradient settings
+  grad_clip_norm: 1.0
+  grad_accumulation_steps: 2
+  
+  # Mixed precision
+  amp:
+    enabled: true
+    dtype: "bfloat16"
+  
+  # Checkpointing
+  checkpoint:
+    save_interval: 5000
+    keep_last: 5
+    resume: null
+
+# Loss settings
+loss:
+  # Flow Matching loss (video only, audio passthrough)
+  flow_matching:
+    type: "rectified"
+    video_weight: 1.0
+  
+  # Temporal consistency
+  temporal_consistency:
+    enabled: true
+    weight: 0.1
+
+# Validation
+validation:
+  enabled: true
+  interval: 1000
+  
+  metrics:
+    - name: "video_fvd"
+    - name: "video_psnr"
+    - name: "video_ssim"
+    - name: "temporal_consistency"
+
+# Logging
+logging:
+  tensorboard:
+    enabled: true
+    log_dir: "./logs/stage4_refiner"
+  
+  wandb:
+    enabled: true
+    project: "alive-wan2x"
+    name: "stage4_refiner"
+  
+  level: "INFO"
+
+# Distributed training
+distributed:
+  backend: "nccl"
+  
+  fsdp:
+    enabled: true
+    sharding_strategy: "FULL_SHARD"
+    mixed_precision: true

@@ -1,0 +1,78 @@
+# ============================================================
+# Alive-Wan2X Requirements
+# ============================================================
+#
+# PyTorch with CUDA 12.8
+# Install command (run BEFORE pip install -r requirements.txt):
+#
+#   pip install torch torchvision torchaudio \
+#       --index-url https://download.pytorch.org/whl/cu128
+#
+# Or add the index URL below so pip resolves it automatically:
+# ============================================================
+
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+# ----------------------------------------------------------------
+# Core: PyTorch (CUDA 12.8 wheels served from the URL above)
+# ----------------------------------------------------------------
+torch>=2.6.0
+torchvision>=0.21.0
+torchaudio>=2.6.0
+
+# ----------------------------------------------------------------
+# Numerical / general
+# ----------------------------------------------------------------
+numpy>=1.26.0
+einops>=0.8.0
+safetensors>=0.4.3
+pillow>=10.3.0
+requests>=2.31.0
+tqdm>=4.66.0
+pyyaml>=6.0.0
+
+# ----------------------------------------------------------------
+# Config
+# ----------------------------------------------------------------
+omegaconf>=2.3.0
+
+# ----------------------------------------------------------------
+# HuggingFace ecosystem
+# ----------------------------------------------------------------
+transformers>=4.45.0
+accelerate>=0.34.0
+huggingface-hub>=0.24.0
+diffusers>=0.30.0            # Wan2.x loading (WanPipeline), StableAudioVAE
+
+# ----------------------------------------------------------------
+# Audio processing
+# ----------------------------------------------------------------
+librosa>=0.10.1
+soundfile>=0.12.1
+descript-audio-codec>=1.0.0  # DACVAE backend
+
+# ----------------------------------------------------------------
+# Video processing
+# ----------------------------------------------------------------
+opencv-python>=4.9.0
+decord>=0.6.0                # Fast GPU-accelerated video decoder
+av>=12.0.0                   # PyAV (used by some torchvision backends)
+
+# ----------------------------------------------------------------
+# Training infrastructure
+# ----------------------------------------------------------------
+wandb>=0.17.0
+tensorboard>=2.17.0
+
+# ----------------------------------------------------------------
+# Evaluation metrics (optional but recommended)
+# ----------------------------------------------------------------
+torchmetrics[video]>=1.4.0   # FVD via I3D
+fadtk>=0.1.0                 # Fréchet Audio Distance (LAION-CLAP based)
+
+# ----------------------------------------------------------------
+# Development
+# ----------------------------------------------------------------
+black>=24.4.0
+ruff>=0.4.0
+pytest>=8.2.0

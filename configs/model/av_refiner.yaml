@@ -1,0 +1,149 @@
+# AV Refiner Configuration
+# Cascaded refinement for 480P → 1080P video upscaling
+# Audio passthrough for synchronization preservation
+
+model:
+  name: "AVRefiner"
+  type: "cascaded_refiner"
+
+  # Video Upsampler
+  video_upsampler:
+    enabled: true
+    
+    # Base model (frozen 480P model)
+    base_model:
+      type: "joint_av_dit"
+      path: "./models/joint_av_dit_480p.pt"
+      freeze: true
+    
+    # Upsampling DiT
+    upsample_dit:
+      dim: 4096
+      num_heads: 32
+      head_dim: 128
+      num_blocks: 24
+      
+      # Input: 480P latents + noise
+      input_dim: 16  # Video latent channels
+      
+      # Conditioning
+      conditioning:
+        low_res_latent:
+          enabled: true
+          dim: 16
+          concat: true
+        
+        timestep:
+          type: "adaln_zero"
+          dim: 4096
+        
+        text:
+          enabled: true
+          cross_attn_dim: 4096
+        
+        video_reference:
+          enabled: true  # Optional: reference frames for temporal consistency
+    
+    # Resolution settings
+    resolution:
+      input:
+        width: 854
+        height: 480
+      output:
+        width: 1920
+        height: 1080
+    
+    # Temporal settings
+    temporal:
+      num_frames: 128
+      fps: 24
+      temporal_attention: true
+
+  # Audio Passthrough
+  audio_passthrough:
+    enabled: true
+    
+    # Frozen Audio DiT
+    audio_dit:
+      type: "audio_dit"
+      path: "./models/audio_dit_pretrained.pt"
+      freeze: true
+    
+    # Passthrough strategy
+    strategy:
+      type: "direct"  # Direct latent passthrough
+      # Alternative: "refine_light" for light refinement
+    
+    # Audio settings (maintain original quality)
+    audio:
+      sample_rate: 16000
+      duration: 5.0  # Match video duration
+      channels: 32
+
+  # Video-Audio Synchronization
+  sync:
+    enabled: true
+    
+    # Temporal alignment
+    alignment:
+      type: "unitime_rope"
+      # Ensure video and audio stay synchronized during upscaling
+    
+    # Loss
+    sync_loss:
+      enabled: true
+      type: "temporal_consistency"
+      weight: 0.1
+
+# Training settings
+training:
+  # Freezes
+  freeze:
+    base_model: true
+    audio_dit: true
+    text_encoder: true
+  
+  # Trainable parameters
+  trainable:
+    video_upsampler: true
+  
+  # Learning rate
+  learning_rate: 1.0e-4
+  weight_decay: 0.01
+  
+  # Batch settings
+  batch_size: 32
+  grad_accumulation: 2
+  
+  # Flow Matching
+  flow_matching:
+    type: "rectified"
+    sigma_min: 0.0001
+    sigma_max: 100.0
+  
+  # Loss weights
+  loss:
+    video_reconstruction: 1.0
+    sync_consistency: 0.1
+
+# Inference settings
+inference:
+  # Two-stage generation
+  pipeline:
+    stage1:
+      model: "joint_av_dit_480p"
+      cfg_scale_text: 7.5
+      cfg_scale_mutual: 2.0
+      num_steps: 50
+    
+    stage2:
+      model: "av_refiner"
+      cfg_scale: 5.0
+      num_steps: 30
+      # Shorter steps for refinement
+  
+  # Memory optimization
+  optimization:
+    cpu_offload: true
+    gradient_checkpointing: true
+    fp16: true

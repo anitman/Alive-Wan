@@ -1,0 +1,190 @@
+# Stage 3: Full Model Fine-tuning Configuration
+# Unfreeze all parameters with very low learning rates for end-to-end optimization
+
+# Experiment metadata
+experiment:
+  name: "stage3_finetune"
+  description: "Full model end-to-end fine-tuning"
+  phase: 3
+
+# Model settings
+model:
+  joint_av_dit:
+    path: "./configs/model/joint_av_dit.yaml"
+    freeze_video_dit: false
+    freeze_audio_dit: false
+    load_from: "./logs/stage2_joint/checkpoint_last.pt"
+
+# Data settings
+data:
+  # Datasets - curated high-quality data
+  datasets:
+    - name: "vggsound_clean"
+      path: "./data/vggsound_clean"
+      weight: 0.25
+      transforms:
+        - video:
+            resize: [480, 480]
+            center_crop: [480, 480]
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+    
+    - name: "lrs3_clean"
+      path: "./data/lrs3_clean"
+      weight: 0.25
+      transforms:
+        - video:
+            resize: [480, 480]
+            center_crop: [480, 480]
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+    
+    - name: "audioset_high"
+      path: "./data/audioset_high"
+      weight: 0.25
+      transforms:
+        - video:
+            resize: [480, 480]
+            center_crop: [480, 480]
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+    
+    - name: "webvid_audio_pro"
+      path: "./data/webvid_audio_pro"
+      weight: 0.25
+      transforms:
+        - video:
+            resize: [480, 480]
+            center_crop: [480, 480]
+        - audio:
+            sample_rate: 16000
+            duration: 5.0
+  
+  # Data loading
+  loader:
+    batch_size: 48
+    num_workers: 8
+    pin_memory: true
+    drop_last: true
+  
+  # Quality filtering
+  quality_filter:
+    enabled: true
+    video:
+      min_aesthetic_score: 0.7
+      max_motion_intensity: 0.9
+    audio:
+      min_snr: 20.0
+      min_clarity: 0.7
+
+# Training settings
+training:
+  # Optimizer with very low learning rates
+  optimizer:
+    type: "adamw"
+    param_groups:
+      - name: "video_dit"
+        lr: 5.0e-6  # Very low LR
+        weight_decay: 0.01
+      - name: "audio_dit"
+        lr: 2.0e-6  # Even lower for audio stability
+        weight_decay: 0.01
+      - name: "ta_cross_attn"
+        lr: 5.0e-5
+        weight_decay: 0.01
+      - name: "projections"
+        lr: 5.0e-5
+        weight_decay: 0.01
+    
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1.0e-8
+  
+  # Learning rate scheduler
+  scheduler:
+    type: "cosine"
+    warmup_steps: 5000
+    total_steps: 100000
+    min_lr_ratio: 0.1
+  
+  # Training loop
+  max_steps: 100000
+  save_steps: 10000
+  eval_steps: 2000
+  log_steps: 50
+  
+  # Gradient settings
+  grad_clip_norm: 0.5  # Stricter clipping
+  grad_accumulation_steps: 4
+  
+  # Mixed precision
+  amp:
+    enabled: true
+    dtype: "bfloat16"
+  
+  # Checkpointing
+  checkpoint:
+    save_interval: 10000
+    keep_last: 3
+    resume: null
+  
+  # EMA
+  ema:
+    enabled: true
+    decay: 0.9999
+    module_decay:
+      audio_dit: 0.99995
+
+# Loss settings
+loss:
+  # Flow Matching loss
+  flow_matching:
+    type: "rectified"
+    video_weight: 1.0
+    audio_weight: 1.0
+  
+  # Optional sync loss
+  sync_loss:
+    enabled: true
+    type: "temporal_alignment"
+    weight: 0.05
+
+# Validation
+validation:
+  enabled: true
+  interval: 2000
+  
+  metrics:
+    - name: "fm_loss"
+    - name: "video_fvd"
+    - name: "audio_fid"
+    - name: "sync_score"
+    - name: "audio_mos"
+    - name: "overall_quality"
+
+# Logging
+logging:
+  tensorboard:
+    enabled: true
+    log_dir: "./logs/stage3_finetune"
+  
+  wandb:
+    enabled: true
+    project: "alive-wan2x"
+    name: "stage3_finetune"
+  
+  level: "INFO"
+
+# Distributed training
+distributed:
+  backend: "nccl"
+  find_unused_parameters: false
+  
+  fsdp:
+    enabled: true
+    sharding_strategy: "FULL_SHARD"
+    mixed_precision: true
+    gradient_checkpointing: true

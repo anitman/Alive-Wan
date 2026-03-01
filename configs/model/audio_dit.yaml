@@ -1,0 +1,84 @@
+# Audio DiT Configuration
+# Based on Alive architecture: 32 blocks, 1536 hidden dim, 24 heads, 64 head_dim
+
+model:
+  name: "AudioDiT"
+  type: "transformer"
+
+  # Core architecture
+  num_blocks: 32
+  hidden_dim: 1536
+  num_heads: 24
+  head_dim: 64
+  
+  # Input/Output
+  input_dim: 32  # Audio latent channels (depends on Audio VAE)
+  output_dim: 32
+  
+  # Dual conditioning
+  conditioning:
+    # Speech text condition (controls what is said)
+    speech_text:
+      enabled: true
+      encoder: "qwen3"  # Uses primary Qwen3 encoder
+      max_length: 256
+      cross_attn_dim: 4096  # Matches Qwen3-8B hidden_size; projected if 4B
+
+    # Descriptive prompt (controls audio style, environment sounds)
+    descriptive_prompt:
+      enabled: true
+      encoder: "qwen3"  # Uses primary Qwen3 encoder
+      max_length: 128
+      cross_attn_dim: 4096  # Matches Qwen3-8B hidden_size; projected if 4B
+    
+    # Timestep conditioning
+    timestep:
+      type: "adaln_zero"
+      mlp_dim: 1536
+      activation: "silu"
+
+  # Attention settings
+  attention:
+    dropout: 0.0
+    bias: true
+    use_flash_attn: true
+
+  # FFN settings
+  ffn:
+    dim: 6144  # 4x hidden_dim
+    activation: "gelu_approx"
+    dropout: 0.0
+
+  # Positional encoding
+  positional_encoding:
+    type: "uni_temp_rope"
+    dim: 64
+    max_period: 10000
+
+  # Audio VAE integration
+  audio_vae:
+    type: "wavvae"  # or "stable_audio" or "dac"
+    temporal_compress: 320  # For UniTemp-RoPE calculation
+    channels: 32
+
+# Training settings
+training:
+  lr: 1.0e-4
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.999
+  
+  batch_size: 256
+  grad_accumulation: 1
+  
+  # Flow Matching
+  flow_matching:
+    sigma_min: 0.0001
+    sigma_max: 100.0
+    rho: 7.0
+
+# Data settings
+data:
+  sample_rate: 16000
+  audio_duration: 5.0  # seconds
+  mel_bins: 128
