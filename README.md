@@ -1,7 +1,5 @@
 # Alive-Wan2X
 
-<div align="center">
-
 **Audio-Visual Video Generation Built on Wan2.x**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -349,5 +347,3 @@ Apache 2.0
 ---
 
 </details>
-
-</div>
